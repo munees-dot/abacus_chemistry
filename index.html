@@ -152,6 +152,15 @@ table.compact th, table.compact td{ padding:5px 8px; font-size:.85rem; }
   padding:10px 14px; margin-top:16px; font-size:.9rem;
 }
 .revision-sheet h3.sub-title{ margin-top:16px; }
+.quiz-nav{
+  display:flex; justify-content:space-between; margin-top:14px;
+}
+.quiz-nav button:disabled{ opacity:.4; cursor:default; }
+.share-toast{
+  display:none; margin-top:12px; background:var(--chain-dark); color:#fff;
+  padding:9px 14px; border-radius:8px; font-size:.85rem; text-align:center;
+}
+.share-toast.show{ display:block; }
 footer.note{
   text-align:center; font-size:.78rem; color:#8a8067; margin:30px 0 10px;
 }
@@ -376,10 +385,18 @@ footer.note{
     <div class="card no-print">
       <h2 class="section-title">ക്വിക്ക് ക്വിസ്</h2>
       <div class="score-bar">
-        <span>സ്കോർ: <b id="scoreVal">0</b> / <span id="totalVal">0</span></span>
-        <button class="btn" onclick="resetQuiz()">വീണ്ടും ചെയ്യുക</button>
+        <span>സ്കോർ: <b id="scoreVal">0</b> / <span id="totalVal">0</span> &nbsp;·&nbsp; ചോദ്യം <b id="qPos">1</b> / <span id="qTotal">0</span></span>
+        <span style="display:flex; gap:8px;">
+          <button class="btn" onclick="shareQuiz()">🔗 പങ്കിടുക</button>
+          <button class="btn secondary" onclick="resetQuiz()">വീണ്ടും ചെയ്യുക</button>
+        </span>
       </div>
       <div id="quizContainer"></div>
+      <div class="quiz-nav">
+        <button class="btn secondary" id="prevBtn" onclick="prevQuestion()">← മുമ്പത്തേത്</button>
+        <button class="btn" id="nextBtn" onclick="nextQuestion()">അടുത്തത് →</button>
+      </div>
+      <div id="shareToast" class="share-toast"></div>
     </div>
   </section>
 
@@ -504,47 +521,85 @@ const quizData = [
 ];
 
 let score = 0;
-let answered = 0;
+let currentQ = 0;
+let userAnswers = new Array(quizData.length).fill(null);
 
-function buildQuiz(){
+function renderQuestion(){
   const container = document.getElementById('quizContainer');
   container.innerHTML = '';
   document.getElementById('totalVal').textContent = quizData.length;
-  quizData.forEach((item, idx)=>{
-    const qDiv = document.createElement('div');
-    qDiv.className = 'quiz-q';
-    qDiv.innerHTML = `<p><b>${idx+1}.</b> ${item.q}</p><div class="quiz-opts"></div>`;
-    const optsDiv = qDiv.querySelector('.quiz-opts');
-    item.opts.forEach((opt, oIdx)=>{
-      const b = document.createElement('button');
-      b.textContent = opt;
-      b.addEventListener('click', ()=>{
-        if(b.disabled) return;
-        const allBtns = optsDiv.querySelectorAll('button');
-        allBtns.forEach(x=>x.disabled=true);
-        if(oIdx === item.ans){
-          b.classList.add('correct');
-          score++;
-        } else {
-          b.classList.add('wrong');
-          allBtns[item.ans].classList.add('correct');
-        }
-        answered++;
-        document.getElementById('scoreVal').textContent = score;
-      });
-      optsDiv.appendChild(b);
+  document.getElementById('qTotal').textContent = quizData.length;
+  document.getElementById('qPos').textContent = currentQ + 1;
+
+  const item = quizData[currentQ];
+  const qDiv = document.createElement('div');
+  qDiv.className = 'quiz-q';
+  qDiv.innerHTML = `<p><b>${currentQ+1}.</b> ${item.q}</p><div class="quiz-opts"></div>`;
+  const optsDiv = qDiv.querySelector('.quiz-opts');
+  const alreadyAnswered = userAnswers[currentQ] !== null;
+
+  item.opts.forEach((opt, oIdx)=>{
+    const b = document.createElement('button');
+    b.textContent = opt;
+    if(alreadyAnswered){
+      b.disabled = true;
+      if(oIdx === item.ans) b.classList.add('correct');
+      else if(oIdx === userAnswers[currentQ]) b.classList.add('wrong');
+    }
+    b.addEventListener('click', ()=>{
+      if(b.disabled) return;
+      const allBtns = optsDiv.querySelectorAll('button');
+      allBtns.forEach(x=>x.disabled=true);
+      userAnswers[currentQ] = oIdx;
+      if(oIdx === item.ans){
+        b.classList.add('correct');
+        score++;
+      } else {
+        b.classList.add('wrong');
+        allBtns[item.ans].classList.add('correct');
+      }
+      document.getElementById('scoreVal').textContent = score;
     });
-    container.appendChild(qDiv);
+    optsDiv.appendChild(b);
   });
+  container.appendChild(qDiv);
+
+  document.getElementById('prevBtn').disabled = (currentQ === 0);
+  document.getElementById('nextBtn').disabled = (currentQ === quizData.length - 1);
+}
+
+function nextQuestion(){
+  if(currentQ < quizData.length - 1){ currentQ++; renderQuestion(); }
+}
+function prevQuestion(){
+  if(currentQ > 0){ currentQ--; renderQuestion(); }
 }
 
 function resetQuiz(){
-  score = 0; answered = 0;
+  score = 0; currentQ = 0;
+  userAnswers = new Array(quizData.length).fill(null);
   document.getElementById('scoreVal').textContent = 0;
-  buildQuiz();
+  renderQuestion();
 }
 
-buildQuiz();
+function shareQuiz(){
+  const answeredCount = userAnswers.filter(a=>a!==null).length;
+  const text = `ഓർഗാനിക് നാമകരണവും ഐസോമെറിസവും — ക്വിക്ക് ക്വിസ്\nഎന്റെ സ്കോർ: ${score} / ${quizData.length} (${answeredCount} ചോദ്യങ്ങൾക്ക് ഉത്തരം നൽകി)`;
+  if(navigator.share){
+    navigator.share({ title: 'ക്വിക്ക് ക്വിസ് സ്കോർ', text: text }).catch(()=>{});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>{
+      const toast = document.getElementById('shareToast');
+      toast.textContent = '✅ സ്കോർ കോപ്പി ചെയ്തു — എവിടെയും പേസ്റ്റ് ചെയ്യാം';
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 2500);
+    });
+  } else {
+    alert(text);
+  }
+}
+
+renderQuestion();
 </script>
 
 </body>
