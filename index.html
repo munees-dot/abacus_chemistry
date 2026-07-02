@@ -161,6 +161,8 @@ table.compact th, table.compact td{ padding:5px 8px; font-size:.85rem; }
   padding:9px 14px; border-radius:8px; font-size:.85rem; text-align:center;
 }
 .share-toast.show{ display:block; }
+.teacher-share{ margin-bottom:14px; }
+.teacher-share .btn{ background:var(--func); }
 footer.note{
   text-align:center; font-size:.78rem; color:#8a8067; margin:30px 0 10px;
 }
@@ -386,10 +388,13 @@ footer.note{
       <h2 class="section-title">ക്വിക്ക് ക്വിസ്</h2>
       <div class="score-bar">
         <span>സ്കോർ: <b id="scoreVal">0</b> / <span id="totalVal">0</span> &nbsp;·&nbsp; ചോദ്യം <b id="qPos">1</b> / <span id="qTotal">0</span></span>
-        <span style="display:flex; gap:8px;">
-          <button class="btn" onclick="shareQuiz()">🔗 പങ്കിടുക</button>
+        <span style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn" onclick="shareScore()">🔗 സ്കോർ പങ്കിടുക</button>
           <button class="btn secondary" onclick="resetQuiz()">വീണ്ടും ചെയ്യുക</button>
         </span>
+      </div>
+      <div class="teacher-share no-print">
+        <button class="btn" onclick="shareQuestions()">📤 ചോദ്യങ്ങൾ വിദ്യാർത്ഥികൾക്ക് അയക്കുക</button>
       </div>
       <div id="quizContainer"></div>
       <div class="quiz-nav">
@@ -582,17 +587,34 @@ function resetQuiz(){
   renderQuestion();
 }
 
-function shareQuiz(){
+function shareScore(){
   const answeredCount = userAnswers.filter(a=>a!==null).length;
   const text = `ഓർഗാനിക് നാമകരണവും ഐസോമെറിസവും — ക്വിക്ക് ക്വിസ്\nഎന്റെ സ്കോർ: ${score} / ${quizData.length} (${answeredCount} ചോദ്യങ്ങൾക്ക് ഉത്തരം നൽകി)`;
+  runShare(text, '✅ സ്കോർ കോപ്പി ചെയ്തു — എവിടെയും പേസ്റ്റ് ചെയ്യാം');
+}
+
+function shareQuestions(){
+  const letters = ['A', 'B', 'C', 'D'];
+  let text = 'ക്വിക്ക് ക്വിസ് — ഓർഗാനിക് നാമകരണവും ഐസോമെറിസവും\n(യൂണിറ്റ് 1, രസതന്ത്രം, സ്റ്റാൻഡേർഡ് 10)\n\n';
+  quizData.forEach((item, idx)=>{
+    text += `${idx+1}. ${item.q}\n`;
+    item.opts.forEach((opt, oIdx)=>{
+      text += `   ${letters[oIdx]}) ${opt}\n`;
+    });
+    text += '\n';
+  });
+  runShare(text, '✅ ചോദ്യങ്ങൾ കോപ്പി ചെയ്തു — WhatsApp / Chat ൽ പേസ്റ്റ് ചെയ്ത് അയക്കാം');
+}
+
+function runShare(text, copySuccessMsg){
   if(navigator.share){
-    navigator.share({ title: 'ക്വിക്ക് ക്വിസ് സ്കോർ', text: text }).catch(()=>{});
+    navigator.share({ title: 'ക്വിക്ക് ക്വിസ്', text: text }).catch(()=>{});
   } else if(navigator.clipboard){
     navigator.clipboard.writeText(text).then(()=>{
       const toast = document.getElementById('shareToast');
-      toast.textContent = '✅ സ്കോർ കോപ്പി ചെയ്തു — എവിടെയും പേസ്റ്റ് ചെയ്യാം';
+      toast.textContent = copySuccessMsg;
       toast.classList.add('show');
-      setTimeout(()=>toast.classList.remove('show'), 2500);
+      setTimeout(()=>toast.classList.remove('show'), 3000);
     });
   } else {
     alert(text);
